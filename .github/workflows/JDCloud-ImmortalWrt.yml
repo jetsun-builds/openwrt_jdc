@@ -172,8 +172,9 @@ jobs:
               'kmod-ath11k-pci',
               'ath11k-firmware-ipq6018', 'ath11k-firmware-qcn9074',
               'ipq-wifi-jdcloud_re-cs-02', 'luci-app-cpufreq', 'luci-app-ddns',
-              'luci-app-upnp', 'luci-app-wol', 'luci-app-nlbwmon',
-              'luci-i18n-nlbwmon-zh-cn', 'athena-led', 'luci-app-athena-led',
+              'luci-app-upnp', 'luci-i18n-upnp-zh-cn', 'miniupnpd-nftables', 'luci-app-wol', 'nlbwmon',
+              'luci-app-nlbwmon', 'luci-i18n-nlbwmon-zh-cn', 'lsblk', 'vnstat2', 'vnstati2',
+              'luci-app-vnstat2', 'luci-i18n-vnstat2-zh-cn', 'athena-led', 'luci-app-athena-led',
               'luci-app-uhttpd', 'tmux',
               'htop', 'btop', 'nano-full', 'apk-mbedtls',
               'kmod-nft-tproxy', 'kmod-nft-socket', 'kmod-tun'}
@@ -195,7 +196,7 @@ jobs:
           Formal release userspace/feeds and Linux 6.12.103 are retained.
           NSS, Wi-Fi backports 7.2, matched firmware and board support are ported
           from the fixed donor recorded in SOURCES.txt, not a relabeled Snapshot.
-          Built-ins: Athena LED v2.4.0 (athena-led core + LuCI JS UI), uhttpd LuCI app, tmux, htop, btop, nano, cpufreq, DDNS, UPnP, WoL, Netlink Bandwidth Monitor and NSS.
+          Built-ins: Athena LED v2.4.0 (athena-led core + LuCI JS UI), lsblk, vnStat 2 with LuCI monitor, nftables-backed UPnP with Chinese LuCI UI, Netlink Bandwidth Monitor, uhttpd LuCI app, tmux, htop, btop, nano, cpufreq, DDNS, WoL and NSS.
           Athena LED uses the JS UI and embeds its translations; it no longer calls the unavailable luci.cbi module.
           Athena LED location lookup uses ipinfo.io with cip.cc as a city fallback; the stale ip-api.com request was removed. Its service is enabled during first boot.
           The missing video APK index is removed from the repository lists during first boot.
@@ -232,7 +233,7 @@ jobs:
           body: |
             京东云雅典娜 RE-CS-02，基于 ImmortalWrt v25.12.2 正式版的 NSS 定制固件，Linux 6.12.103。
             正式版源码 4fc16f2985a358bd43bb522e43f05395fcbd6ed5；NSS donor 0a98e096208584bf90982f59f6d5a43f89443276。
-            NSS/ECM、PPPoE、桥接/VLAN、ath11k Wi-Fi NSS；内置雅典娜 LED v2.4.0（athena-led 核心 + LuCI JS 界面）、luci-app-uhttpd、tmux、htop、btop、nano、cpufreq、DDNS、UPnP、WoL。
+            NSS/ECM、PPPoE、桥接/VLAN、ath11k Wi-Fi NSS；内置雅典娜 LED v2.4.0（athena-led 核心 + LuCI JS 界面）、lsblk、vnStat 2（含 LuCI 流量监控）、nftables 版 miniupnpd、中文 LuCI UPnP 界面、Netlink Bandwidth Monitor、luci-app-uhttpd、tmux、htop、btop、nano、cpufreq、DDNS、WoL。
             内置 luci-app-nlbwmon。PassWall2、Xray、Sing-Box、frpc/frps 不包含，不发布可选软件包合集。
             APK 使用 ImmortalWrt 25.12.2 用户态源，NSS 内核 ABI 与官方 kmod 不兼容。PassWall2 需其项目源。路由器端若仍报 wget Operation not permitted，需另行检查路由器 WAN/DNS/路由/防火墙。
             内置 nft tproxy/socket 与 tun；省略旧式 nft/iptables compat，避免打包缺失的 ip_tables.ko。
