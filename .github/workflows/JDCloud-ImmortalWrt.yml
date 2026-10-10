@@ -71,8 +71,12 @@ jobs:
             --manifest-path "$led_checkout/athena-led/Cargo.toml"
           test ! -e "$SOURCE_PATH/package/athena-led"
           test ! -e "$SOURCE_PATH/package/luci-app-athena-led"
+          led_pkg_version=$(sed -n 's/^PKG_VERSION:=//p' "$led_checkout/athena-led/Makefile")
           led_pkg_source=$(sed -n 's/^PKG_SOURCE:=//p' "$led_checkout/athena-led/Makefile")
+          test -n "$led_pkg_version"
           test -n "$led_pkg_source"
+          led_pkg_source=${led_pkg_source//\$\(PKG_VERSION\)/$led_pkg_version}
+          test "$led_pkg_source" = "athena-led-aarch64-unknown-linux-musl-v${led_pkg_version}.tar.gz"
           mkdir -p "$SOURCE_PATH/dl" "$RUNNER_TEMP/athena-led-package"
           cp "$CARGO_TARGET_DIR/aarch64-unknown-linux-musl/release/athena-led" \
             "$RUNNER_TEMP/athena-led-package/athena-led"
