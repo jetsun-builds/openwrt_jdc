@@ -153,7 +153,6 @@ jobs:
               CONFIG_KERNEL_DEBUG_FS=y \
               CONFIG_KERNEL_DYNAMIC_DEBUG=y \
               CONFIG_KERNEL_DEBUG_INFO=y \
-              CONFIG_KERNEL_DEBUG_INFO_REDUCED=n \
               CONFIG_KERNEL_KALLSYMS=y \
               CONFIG_PACKAGE_ATH_DEBUG=y \
               CONFIG_PACKAGE_MAC80211_DEBUGFS=y \
