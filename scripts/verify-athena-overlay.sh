@@ -14,13 +14,17 @@ root_dir="$test_dir/rootfs"
 mkdir -p "$diagnostics_dir"
 
 # Device/jdcloud_re-cs-02 pads the kernel to 6144 KiB before SquashFS.
-unsquashfs -no-progress -d "$root_dir" -o $((6144 * 1024)) "${images[0]}"
+# Select only the required directories. /dev/console is a special device node
+# that cannot be extracted by the unprivileged runner, and is not used here.
+unsquashfs -no-progress -d "$root_dir" -o $((6144 * 1024)) "${images[0]}" lib usr etc
 test -x "$root_dir/usr/sbin/mkfs.f2fs"
 test -x "$root_dir/usr/sbin/fsck.f2fs"
 test -x "$root_dir/usr/sbin/mkfs.ext4"
 test -x "$root_dir/usr/bin/sgdisk"
 test -n "$(find "$root_dir/lib/modules" -name 'f2fs.ko*' -print -quit)"
 grep -RFxq f2fs "$root_dir/etc/modules-boot.d"
+qemu-aarch64-static -L "$root_dir" "$root_dir/usr/bin/sgdisk" --version \
+  2>&1 | tee "$diagnostics_dir/sgdisk-version.log"
 
 # Use the actual target binaries and libraries, not the runner's mkfs tools.
 truncate -s 8G "$test_dir/expanded-overlay.img"

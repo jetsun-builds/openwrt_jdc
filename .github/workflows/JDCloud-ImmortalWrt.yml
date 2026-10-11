@@ -21,7 +21,7 @@ defaults:
     shell: bash
 concurrency:
   group: jdcloud-stable-nss-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 env:
   SOURCE_PATH: /mnt/immortalwrt-stable
   TZ: Asia/Shanghai
