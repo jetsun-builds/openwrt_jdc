@@ -30,6 +30,7 @@
 - 配置为 `configs/JDCloud-Stable.config` 加 `configs/Stable-General.config`；内置雅典娜 LED 控制（固定使用 NONGFAH 插件提交 `564942b`）、luci-app-uhttpd、tmux、htop、btop、nano、cpufreq、DDNS、UPnP、WoL 和 nlbwmon，不内置 PassWall2 或 frpc/frps，不构建可选软件包合集。
 - 默认管理地址为 `192.168.1.1`。APK 保留官方 25.12.2 用户态源；NSS 内核 ABI 不同，官方目标/kmod 源禁用。PassWall2 需要其项目提供的兼容源。
 - 固件校验通过后发布到 `JDCloud-25.12.2-NSS-*`，附带源码、配置、manifest 和 SHA256 记录。实机验证另行进行，首次刷机前应核对官方系统的 eMMC GPT。
+- 扩容 rootfs 的 F2FS 初始化工具和驱动直接内置，保留小分区的 ext4 支持；构建校验实际镜像内容和 ARM64 工具。内置 `sgdisk`，GPT 主表/备份表只读检查及持久化验证见 [雅典娜存储说明](docs/athena-storage.md)。
 
 ## 小米 AX3600 正式版 NSS 构建
 - `AX3600-ImmortalWrt` 使用相同的 ImmortalWrt `v25.12.2` 稳定版基线、Linux `6.12.103` 和固定 NSS 移植脚本。

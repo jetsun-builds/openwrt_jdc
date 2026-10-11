@@ -8,6 +8,7 @@ on:
       - .github/workflows/JDCloud-ImmortalWrt.yml
       - configs/JDCloud-Stable.config
       - scripts/prepare-stable-nss.sh
+      - scripts/verify-athena-overlay.sh
       - scripts/uci-defaults/**
       - patches/athena-led/**
   workflow_dispatch:
@@ -40,11 +41,13 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential clang flex bison gawk gettext git libncurses-dev libssl-dev libelf-dev zlib1g-dev liblzma-dev python3 python3-setuptools python3-pyelftools rsync swig unzip file wget curl ca-certificates time ccache zstd device-tree-compiler quilt patch pkgconf jq
+          sudo apt-get install -y --no-install-recommends build-essential clang flex bison gawk gettext git libncurses-dev libssl-dev libelf-dev zlib1g-dev liblzma-dev python3 python3-setuptools python3-pyelftools rsync swig unzip file wget curl ca-certificates time ccache zstd device-tree-compiler quilt patch pkgconf jq qemu-user-static squashfs-tools
           sudo mkdir -p "$SOURCE_PATH"
           sudo chown "$(id -u):$(id -g)" "$SOURCE_PATH"
           mkdir -p artifacts/firmware artifacts/diagnostics
           df -h "$SOURCE_PATH"
+      - name: Check release cleanup guards
+        run: python3 tests/test_release_cleanup.py
       - name: Port pinned NSS and Athena support onto the formal release
         run: bash scripts/prepare-stable-nss.sh "$SOURCE_PATH"
       - name: Set up Rust and Zig cross-build tools
@@ -181,7 +184,9 @@ jobs:
               'luci-app-vnstat2', 'luci-i18n-vnstat2-zh-cn', 'athena-led', 'luci-app-athena-led',
               'luci-app-uhttpd', 'tmux',
               'htop', 'btop', 'nano-full', 'apk-mbedtls',
-              'kmod-nft-tproxy', 'kmod-nft-socket', 'kmod-tun'}
+              'kmod-nft-tproxy', 'kmod-nft-socket', 'kmod-tun',
+              'block-mount', 'fstools', 'e2fsprogs', 'kmod-fs-ext4',
+              'mkf2fs', 'f2fsck', 'kmod-fs-f2fs', 'sgdisk'}
           assert required <= packages, required - packages
           forbidden = {'frpc','frps','luci-app-frpc','luci-app-frps','luci-app-passwall2','xray-core','sing-box','kmod-nft-compat','kmod-nf-ipt'}
           assert not forbidden & packages, forbidden & packages
@@ -193,6 +198,7 @@ jobs:
           assert any('initramfs' in p.name and p.suffix == '.itb' for p in images)
           print('Verified formal release baseline, kernel, NSS, Wi-Fi, built-ins and exclusions.')
           PY
+          bash scripts/verify-athena-overlay.sh "$SOURCE_PATH" "$GITHUB_WORKSPACE/artifacts/diagnostics"
           find "$image_dir" -maxdepth 1 -type f -exec cp {} artifacts/firmware/ \;
           cp artifacts/diagnostics/SOURCES.txt artifacts/diagnostics/config.diff artifacts/firmware/
           cat > artifacts/firmware/READ-ME.txt <<'EOF'
@@ -201,6 +207,9 @@ jobs:
           NSS, Wi-Fi backports 7.2, matched firmware and board support are ported
           from the fixed donor recorded in SOURCES.txt, not a relabeled Snapshot.
           Built-ins: Athena LED v2.4.0 (athena-led core + LuCI JS UI), lsblk, vnStat 2 with LuCI monitor, nftables-backed UPnP with Chinese LuCI UI, Netlink Bandwidth Monitor, uhttpd LuCI app, tmux, htop, btop, nano, cpufreq, DDNS, WoL and NSS.
+          Storage: mkf2fs, f2fsck, early-loaded F2FS kernel module, ext4 tools/driver and sgdisk are image-installed. fstools selects F2FS when the rootfs tail exceeds 100 MiB, including a GPT-expanded 8 GiB rootfs partition. Small original partitions retain ext4 support. No repartitioning or GPT repair runs automatically.
+          Build validation extracts this factory image, checks the tools and boot module, and executes its ARM64 tools to format/check a disposable 8 GiB F2FS image and format a 60 MiB ext4 image. On-device boot and persistence still require verification.
+          GPT read-only checks: sgdisk --verify /dev/mmcblk0; sgdisk --print /dev/mmcblk0; sgdisk --info=18 /dev/mmcblk0. Inspect both GPT copies before any write. See docs/athena-storage.md in the builder repository.
           Athena LED uses the JS UI and embeds its translations; it no longer calls the unavailable luci.cbi module.
           Athena LED location lookup uses ipinfo.io with cip.cc as a city fallback; the stale ip-api.com request was removed. Its service is enabled during first boot.
           The missing video APK index is removed from the repository lists during first boot.
@@ -213,9 +222,7 @@ jobs:
           and tun support are included; legacy nft/iptables compatibility is
           omitted because its old ip_tables.ko is absent in this kernel build.
           Netlink Bandwidth Monitor is included as luci-app-nlbwmon.
-          Layout: Athena eMMC 0:HLOS + rootfs. The owner's stock JDCOS GPT has
-          not been read: verify it before first flash. Hardware boot/NSS must
-          still be tested. Read factory/sysupgrade/initramfs instructions before use.
+          Layout: Athena eMMC 0:HLOS + rootfs, including the same partition's enlarged GPT capacity. The owner reported a valid 8 GiB kernel-visible p18 but a GPT entry-array CRC warning; that warning is separate from the fixed missing-F2FS-tools fault and needs read-only investigation. Hardware boot/NSS must still be tested. Read factory/sysupgrade/initramfs instructions before use.
           Default address: 192.168.1.1; configure a password after installation.
           EOF
           (cd artifacts/firmware && sha256sum * > SHA256SUMS)
@@ -242,6 +249,13 @@ jobs:
             APK 使用 ImmortalWrt 25.12.2 用户态源，NSS 内核 ABI 与官方 kmod 不兼容。PassWall2 需其项目源。路由器端若仍报 wget Operation not permitted，需另行检查路由器 WAN/DNS/路由/防火墙。
             内置 nft tproxy/socket 与 tun；省略旧式 nft/iptables compat，避免打包缺失的 ip_tables.ko。
             包含 factory、sysupgrade、initramfs 镜像；实机验证尚未完成，首次刷机前核对官方 GPT。
+            修复扩容 rootfs 后配置重启丢失：内置 mkf2fs、f2fsck、早期加载的 kmod-fs-f2fs，并保留 ext4 支持。支持同一 rootfs 分区扩到 8GiB 后的 overlay 初始化，构建中验证镜像内容及实际 ARM64 格式化工具；路由器重启持久化仍需实机验证。
+            内置 sgdisk，便于只读检查 GPT 主表/备份表；不会自动修改分区表。检查说明见 docs/athena-storage.md。
             构建记录：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
             详见 READ-ME.txt、SOURCES.txt、manifest、配置、SHA256SUMS。
+      - name: Remove the eight explicitly superseded releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP_TAG: JDCloud-25.12.2-NSS-${{ github.run_number }}
+        run: python3 scripts/delete-old-releases.py
 
