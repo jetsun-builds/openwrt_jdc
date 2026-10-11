@@ -12,7 +12,18 @@ on:
       - scripts/uci-defaults/**
       - patches/athena-led/**
   workflow_dispatch:
+    inputs:
+      debug_build:
+        description: Build the temporary Athena wireless diagnostics release
+        type: boolean
+        required: false
+        default: false
   workflow_call:
+    inputs:
+      debug_build:
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -28,11 +39,13 @@ env:
 
 jobs:
   build:
-    name: Athena / ImmortalWrt 25.12.2 release + NSS / Linux 6.12.103
+    name: Athena / ImmortalWrt 25.12.2 + NSS / Linux 6.12.103
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     permissions:
       contents: write
+    env:
+      ATHENA_DEBUG_BUILD: ${{ (github.event_name == 'workflow_dispatch' && inputs.debug_build) || (github.event_name == 'workflow_call' && inputs.debug_build) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[athena-debug]')) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,6 +126,10 @@ jobs:
         run: |
           set -euo pipefail
           cat configs/JDCloud-Stable.config configs/Stable-General.config > "$SOURCE_PATH/.config"
+          if [[ "$ATHENA_DEBUG_BUILD" == "true" ]]; then
+            cat configs/JDCloud-Debug.config >> "$SOURCE_PATH/.config"
+            install -D -m 0755 scripts/athena-debug-capture.sh "$SOURCE_PATH/files/usr/sbin/athena-debug-capture"
+          fi
           cp "$SOURCE_PATH/.config" artifacts/diagnostics/config.seed
           cd "$SOURCE_PATH"
           make defconfig
@@ -130,7 +147,26 @@ jobs:
             exit 1
           fi
           grep -Fxq 'CONFIG_USE_APK=y' .config
-          grep -Fxq 'CONFIG_VERSION_NUMBER="25.12.2-nss"' .config
+          if [[ "$ATHENA_DEBUG_BUILD" == "true" ]]; then
+            grep -Fxq 'CONFIG_VERSION_NUMBER="25.12.2-nss-debug"' .config
+            for requested in \
+              CONFIG_KERNEL_DEBUG_FS=y \
+              CONFIG_KERNEL_DYNAMIC_DEBUG=y \
+              CONFIG_KERNEL_DEBUG_INFO=y \
+              CONFIG_KERNEL_DEBUG_INFO_REDUCED=n \
+              CONFIG_KERNEL_KALLSYMS=y \
+              CONFIG_PACKAGE_ATH_DEBUG=y \
+              CONFIG_PACKAGE_MAC80211_DEBUGFS=y \
+              CONFIG_PACKAGE_MAC80211_TRACING=y \
+              CONFIG_ATH11K_DEBUGFS_STA=y \
+              CONFIG_ATH11K_DEBUGFS_HTT_STATS=y \
+              CONFIG_PACKAGE_tcpdump-mini=y; do
+              grep -Fxq "$requested" .config || { echo "Missing diagnostic option: $requested"; exit 1; }
+            done
+            grep -Fxq '# CONFIG_KERNEL_DEBUG_INFO_REDUCED is not set' .config
+          else
+            grep -Fxq 'CONFIG_VERSION_NUMBER="25.12.2-nss"' .config
+          fi
           grep -Fxq 'CONFIG_PACKAGE_athena-led=y' .config
           grep -Fxq 'CONFIG_PACKAGE_luci-app-athena-led=y' .config
           ! grep -Eq '^CONFIG_PACKAGE_(frpc|frps|luci-app-frpc|luci-app-frps|luci-app-passwall2|xray-core|sing-box)=[ym]$' .config
@@ -142,6 +178,10 @@ jobs:
           cp .config "$GITHUB_WORKSPACE/artifacts/diagnostics/config.full"
           ./scripts/diffconfig.sh > "$GITHUB_WORKSPACE/artifacts/diagnostics/config.diff"
           cp "$GITHUB_WORKSPACE/artifacts/diagnostics/SOURCES.txt" files/etc/nss-build-info
+          if [[ "$ATHENA_DEBUG_BUILD" == "true" ]]; then
+            printf 'Build profile: temporary Athena wireless diagnostics; ath11k debug, tracepoints and DWARF symbols enabled.\n' \
+              >> files/etc/nss-build-info
+          fi
       - name: Download sources
         run: |
           set -euo pipefail
@@ -151,7 +191,23 @@ jobs:
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
+          if [[ "$ATHENA_DEBUG_BUILD" == "true" ]]; then
+            printf '\n# Athena temporary wireless diagnostics\nCONFIG_DEBUG_INFO=y\nCONFIG_DYNAMIC_DEBUG=y\nCONFIG_DEBUG_FS=y\nCONFIG_KALLSYMS=y\n' \
+              >> target/linux/qualcommax/config-6.12
+          fi
           make target/linux/prepare -j"$(nproc)" V=s 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/diagnostics/kernel-prepare.log"
+      - name: Verify diagnostic kernel configuration
+        if: env.ATHENA_DEBUG_BUILD == 'true'
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_PATH"
+          config=target/linux/qualcommax/config-6.12
+          for option in CONFIG_DEBUG_INFO CONFIG_DYNAMIC_DEBUG CONFIG_DEBUG_FS CONFIG_KALLSYMS; do
+            grep -Fxq "$option=y" "$config" || { echo "Missing kernel debug option: $option"; exit 1; }
+          done
+          cp "$config" "$GITHUB_WORKSPACE/artifacts/diagnostics/qualcommax-kernel-config-6.12"
+          grep -E '^CONFIG_(ATH11K|MAC80211|CFG80211|DEBUG_INFO|DYNAMIC_DEBUG|DEBUG_FS|KALLSYMS|TRACING|FTRACE)' "$config" \
+            > "$GITHUB_WORKSPACE/artifacts/diagnostics/wireless-debug-kernel-options.txt"
       - name: Build firmware
         run: |
           set -euo pipefail
@@ -159,15 +215,49 @@ jobs:
           if ! make -j"$(nproc)" 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/diagnostics/build.log"; then
             make -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/artifacts/diagnostics/build-retry.log"
           fi
+      - name: Verify ath11k backports diagnostics were compiled
+        if: env.ATHENA_DEBUG_BUILD == 'true'
+        run: |
+          set -euo pipefail
+          python3 - "$SOURCE_PATH/build_dir" "$GITHUB_WORKSPACE/artifacts/diagnostics" <<'PY'
+          import pathlib, sys
+
+          build_root = pathlib.Path(sys.argv[1])
+          output = pathlib.Path(sys.argv[2])
+          required = {
+              'CPTCFG_ATH11K_DEBUG=y',
+              'CPTCFG_ATH11K_DEBUGFS=y',
+              'CPTCFG_ATH11K_DEBUGFS_STA=y',
+              'CPTCFG_ATH11K_DEBUGFS_HTT_STATS=y',
+              'CPTCFG_MAC80211_DEBUGFS=y',
+              'CPTCFG_CFG80211_DEBUGFS=y',
+              'CPTCFG_ATH11K_TRACING=y',
+          }
+          matches = []
+          for config in build_root.rglob('.config'):
+              try:
+                  lines = set(config.read_text(errors='replace').splitlines())
+              except OSError:
+                  continue
+              if required <= lines:
+                  matches.append(config)
+          if not matches:
+              raise SystemExit('No backports .config contains all ath11k debug/debugfs/tracing options')
+          chosen = max(matches, key=lambda path: path.stat().st_mtime_ns)
+          (output / 'mac80211-backports.config').write_bytes(chosen.read_bytes())
+          print(f'Verified ath11k diagnostics in {chosen}')
+          PY
       - name: Verify and collect firmware
         run: |
           set -euo pipefail
           image_dir="$SOURCE_PATH/bin/targets/qualcommax/ipq60xx"
-          python3 - "$image_dir" <<'PY'
+          python3 - "$image_dir" "$ATHENA_DEBUG_BUILD" <<'PY'
           import json, pathlib, sys
           root = pathlib.Path(sys.argv[1])
+          debug = sys.argv[2].lower() == 'true'
           metadata = json.loads((root / 'profiles.json').read_text())
-          assert metadata['version_number'] == '25.12.2-nss', metadata['version_number']
+          expected_version = '25.12.2-nss-debug' if debug else '25.12.2-nss'
+          assert metadata['version_number'] == expected_version, metadata['version_number']
           profile = metadata['profiles']['jdcloud_re-cs-02']
           assert any(image['type'] == 'sysupgrade' for image in profile['images'])
           manifests = list(root.glob('*.manifest'))
@@ -187,6 +277,8 @@ jobs:
               'kmod-nft-tproxy', 'kmod-nft-socket', 'kmod-tun',
               'block-mount', 'fstools', 'e2fsprogs', 'kmod-fs-ext4',
               'mkf2fs', 'f2fsck', 'kmod-fs-f2fs', 'sgdisk'}
+          if debug:
+              required |= {'tcpdump-mini'}
           assert required <= packages, required - packages
           forbidden = {'frpc','frps','luci-app-frpc','luci-app-frps','luci-app-passwall2','xray-core','sing-box','kmod-nft-compat','kmod-nf-ipt'}
           assert not forbidden & packages, forbidden & packages
@@ -196,9 +288,58 @@ jobs:
           assert any(p.name.endswith('-sysupgrade.bin') for p in images)
           assert any(p.name.endswith('-factory.bin') for p in images)
           assert any('initramfs' in p.name and p.suffix == '.itb' for p in images)
-          print('Verified formal release baseline, kernel, NSS, Wi-Fi, built-ins and exclusions.')
+          print(f'Verified formal release baseline, kernel, NSS, Wi-Fi, built-ins and exclusions (debug={debug}).')
           PY
           bash scripts/verify-athena-overlay.sh "$SOURCE_PATH" "$GITHUB_WORKSPACE/artifacts/diagnostics"
+          if [[ "$ATHENA_DEBUG_BUILD" == "true" ]]; then
+            symbols="$RUNNER_TEMP/athena-debug-symbols"
+            mkdir -p "$symbols/modules"
+            python3 - "$SOURCE_PATH/build_dir" "$symbols" "$SOURCE_PATH" <<'PY'
+          import pathlib, shutil, subprocess, sys
+
+          build_root = pathlib.Path(sys.argv[1])
+          output = pathlib.Path(sys.argv[2])
+          source = pathlib.Path(sys.argv[3])
+
+          def has_debug_info(path):
+              result = subprocess.run(['readelf', '-S', str(path)], capture_output=True, text=True)
+              return result.returncode == 0 and '.debug_info' in result.stdout
+
+          kernels = [p for p in build_root.rglob('vmlinux') if p.is_file() and has_debug_info(p)]
+          if not kernels:
+              raise SystemExit('No unstripped vmlinux with DWARF .debug_info was built')
+          vmlinux = max(kernels, key=lambda p: p.stat().st_size)
+          shutil.copy2(vmlinux, output / 'vmlinux')
+          system_map = vmlinux.parent / 'System.map'
+          if system_map.is_file():
+              shutil.copy2(system_map, output / 'System.map')
+          kernel_config = vmlinux.parent / '.config'
+          if kernel_config.is_file():
+              shutil.copy2(kernel_config, output / 'kernel.config')
+
+          wanted = {'ath11k.ko', 'ath11k_pci.ko', 'mac80211.ko', 'cfg80211.ko', 'compat.ko'}
+          copied = set()
+          for module in build_root.rglob('*.ko'):
+              if module.name not in wanted or not has_debug_info(module):
+                  continue
+              relative = module.relative_to(build_root)
+              destination = output / 'modules' / relative
+              destination.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(module, destination)
+              copied.add(module.name)
+          required_modules = {'ath11k.ko', 'ath11k_pci.ko', 'mac80211.ko', 'cfg80211.ko'}
+          if not required_modules <= copied:
+              raise SystemExit(f'Missing unstripped wireless modules: {sorted(required_modules - copied)}')
+
+          shutil.copy2(source / '.config', output / 'openwrt.config')
+          (output / 'symbol-sources.txt').write_text(
+              'vmlinux: ' + str(vmlinux.relative_to(build_root)) + '\n' +
+              'unstripped modules are stored under modules/ with build_dir-relative paths\n' +
+              'match these symbols only with images from the same GitHub Actions run\n')
+          print(f'Collected DWARF symbols from {vmlinux} and {len(copied)} wireless modules')
+          PY
+            tar --zstd -cf artifacts/firmware/athena-debug-symbols.tar.zst -C "$symbols" .
+          fi
           find "$image_dir" -maxdepth 1 -type f -exec cp {} artifacts/firmware/ \;
           cp artifacts/diagnostics/SOURCES.txt artifacts/diagnostics/config.diff artifacts/firmware/
           cat > artifacts/firmware/READ-ME.txt <<'EOF'
@@ -225,20 +366,28 @@ jobs:
           Layout: Athena eMMC 0:HLOS + rootfs, including the same partition's enlarged GPT capacity. The owner reported a valid 8 GiB kernel-visible p18 but a GPT entry-array CRC warning; that warning is separate from the fixed missing-F2FS-tools fault and needs read-only investigation. Hardware boot/NSS must still be tested. Read factory/sysupgrade/initramfs instructions before use.
           Default address: 192.168.1.1; configure a password after installation.
           EOF
+          if [[ "$ATHENA_DEBUG_BUILD" == "true" ]]; then
+            cat >> artifacts/firmware/READ-ME.txt <<'EOF'
+          DIAGNOSTIC BUILD: enables ath11k debug/debugfs, mac80211 debugfs, dynamic debug, kernel DWARF symbols and tcpdump-mini.
+          Use athena-debug-capture enable-reg before reproducing the outage, run tcpdump -ni phy2-sta0 -nn -tttt 'arp or icmp or port 53' in a second session, then run athena-debug-capture capture and athena-debug-capture disable-reg. The archive is stored under /tmp and survives only until reboot.
+          The matching athena-debug-symbols.tar.zst is for offline analysis and must not be installed on the router. See docs/athena-wireless-debug.md.
+          EOF
+            cp docs/athena-wireless-debug.md artifacts/firmware/
+          fi
           (cd artifacts/firmware && sha256sum * > SHA256SUMS)
           echo 'Athena: formal ImmortalWrt 25.12.2 baseline + NSS and requested LED/admin packages compiled and verified; hardware validation pending.' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Athena-stable-NSS-diagnostics-${{ github.run_number }}
+          name: Athena-stable-NSS${{ env.ATHENA_DEBUG_BUILD == 'true' && '-debug' || '' }}-diagnostics-${{ github.run_number }}
           path: artifacts/diagnostics/
           retention-days: 30
       - name: Publish verified firmware
         uses: ncipollo/release-action@v1
         with:
-          tag: JDCloud-25.12.2-NSS-${{ github.run_number }}
-          name: Athena ImmortalWrt 25.12.2 + NSS
+          tag: JDCloud-25.12.2-NSS-${{ env.ATHENA_DEBUG_BUILD == 'true' && 'debug-' || '' }}${{ github.run_number }}
+          name: Athena ImmortalWrt 25.12.2 + NSS${{ env.ATHENA_DEBUG_BUILD == 'true' && ' (wireless diagnostics)' || '' }}
           commit: ${{ github.sha }}
           artifacts: artifacts/firmware/*
           body: |
@@ -251,11 +400,12 @@ jobs:
             包含 factory、sysupgrade、initramfs 镜像；实机验证尚未完成，首次刷机前核对官方 GPT。
             修复扩容 rootfs 后配置重启丢失：内置 mkf2fs、f2fsck、早期加载的 kmod-fs-f2fs，并保留 ext4 支持。支持同一 rootfs 分区扩到 8GiB 后的 overlay 初始化，构建中验证镜像内容及实际 ARM64 格式化工具；路由器重启持久化仍需实机验证。
             内置 sgdisk，便于只读检查 GPT 主表/备份表；不会自动修改分区表。检查说明见 docs/athena-storage.md。
+            ${{ env.ATHENA_DEBUG_BUILD == 'true' && '本次为临时无线诊断版本：启用 ath11k debug/debugfs、mac80211 debugfs、内核动态调试和 tcpdump-mini；另附与固件匹配的 DWARF 符号包。采集步骤见 docs/athena-wireless-debug.md。' || '' }}
             构建记录：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
             详见 READ-ME.txt、SOURCES.txt、manifest、配置、SHA256SUMS。
       - name: Remove the eight explicitly superseded releases
         env:
           GH_TOKEN: ${{ github.token }}
-          KEEP_TAG: JDCloud-25.12.2-NSS-${{ github.run_number }}
+          KEEP_TAG: JDCloud-25.12.2-NSS-${{ env.ATHENA_DEBUG_BUILD == 'true' && 'debug-' || '' }}${{ github.run_number }}
         run: python3 scripts/delete-old-releases.py
 
