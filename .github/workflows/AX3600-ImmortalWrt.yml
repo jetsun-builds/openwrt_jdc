@@ -146,6 +146,9 @@ jobs:
               'luci-app-wol', 'luci-i18n-wol-zh-cn',
               'luci-app-nlbwmon', 'luci-i18n-nlbwmon-zh-cn',
               'tmux', 'htop', 'btop', 'nano-full', 'apk-mbedtls',
+              'ethtool', 'iperf3', 'collectd',
+              'collectd-mod-cpu', 'collectd-mod-memory', 'collectd-mod-load',
+              'collectd-mod-interface', 'collectd-mod-df', 'collectd-mod-uptime',
               'kmod-nft-tproxy', 'kmod-nft-socket', 'kmod-tun',
           }
           assert required <= packages, required - packages
@@ -197,7 +200,7 @@ jobs:
           Published images: the profile-specific factory.ubi, sysupgrade.bin and initramfs-factory.ubi recovery image. All three are built for the expanded-layout profile.
           The chenxin527 U-Boot project lists AX3600 and documents NAND Factory UBI support; it does not support flashing a Sysupgrade archive itself. Use factory.ubi only via the documented U-Boot method, and sysupgrade.bin only from a running compatible OpenWrt installation. The initramfs image is for recovery. Bootloader-specific flashing has not been tested on the owner's router.
           Never write these images directly to arbitrary MTD partitions. Confirm the exact partition layout and image purpose before flashing.
-          Built-ins match the Athena build's general package set: cpufreq, DDNS, UPnP, WoL, Netlink Bandwidth Monitor, uhttpd LuCI, tmux, htop, btop, nano, TUN and nftables tproxy/socket support. Athena LED control and its Chinese translation are omitted. Other common Chinese LuCI translations are retained.
+          Built-ins match the Athena build's general package set: cpufreq, DDNS, UPnP, WoL, Netlink Bandwidth Monitor, uhttpd LuCI, tmux, htop, btop, nano, TUN and nftables tproxy/socket support. AX3600 also includes ethtool, iperf3 and collectd with CPU, memory, load, interface, disk-space and uptime input plugins. Athena LED control and its Chinese translation are omitted. Other common Chinese LuCI translations are retained.
           PassWall2, Xray, Sing-Box, frpc/frps and optional-package bundles are not included.
           APK user-space sources use the official ImmortalWrt 25.12.2 release. Official kernel/module feeds are disabled because NSS changes the kernel ABI; do not install official kmods over this kernel.
           NSS uses the selected IPQ807x 11.4 firmware profile. NSS throughput, Wi-Fi stability, U-Boot recovery and flashing still need real-device validation.
@@ -224,7 +227,7 @@ jobs:
           body: |
             小米 AX3600，基于 ImmortalWrt v25.12.2 正式版的 NSS 定制固件，Linux 6.12.103。
             仅构建 `xiaomi_ax3600` OpenWrt 扩容分区布局；不包含 `xiaomi_ax3600-stock` 镜像。发布 Factory UBI、sysupgrade 和 initramfs 恢复镜像。
-            软件包与雅典娜通用集相同；省略雅典娜 LED 插件及其中文翻译。PassWall2、Xray、Sing-Box、frpc/frps 和可选软件包合集均不包含。
+            沿用雅典娜通用软件集，并额外内置 ethtool、iperf3，以及 collectd 和 CPU、内存、负载、接口、磁盘空间、运行时间采集插件；省略雅典娜 LED 插件及其中文翻译。PassWall2、Xray、Sing-Box、frpc/frps 和可选软件包合集均不包含。
             保留官方 25.12.2 用户态 APK 源；因 NSS 内核 ABI 已修改，官方 kmod 源不可用于内核模块。
             chenxin527 U-Boot 项目列出 AX3600 并说明支持 NAND Factory UBI，但它不能通过 U-Boot 刷 sysupgrade；设备实测与本机刷写尚未验证。请先阅读 READ-ME.txt 并核对设备分区布局。
             构建记录：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

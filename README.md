@@ -35,7 +35,7 @@
 ## 小米 AX3600 正式版 NSS 构建
 - `AX3600-ImmortalWrt` 使用相同的 ImmortalWrt `v25.12.2` 稳定版基线、Linux `6.12.103` 和固定 NSS 移植脚本。
 - 只构建 `xiaomi_ax3600` OpenWrt 扩容分区布局，不构建 `xiaomi_ax3600-stock`。发布 Factory UBI、sysupgrade 与 initramfs 恢复镜像。chenxin527 U-Boot 文档支持 AX3600 和 NAND Factory UBI，但不支持通过 U-Boot 刷 sysupgrade。
-- 软件包沿用 `configs/Stable-General.config`，包括 cpufreq、DDNS、UPnP、WoL、nlbwmon、uhttpd LuCI、tmux、htop、btop、nano 和 nftables/tun 支持；不包含雅典娜 LED 及其中文翻译、PassWall2、Xray、Sing-Box、frpc/frps 或可选软件包合集。
+- 软件包沿用 `configs/Stable-General.config`，包括 cpufreq、DDNS、UPnP、WoL、nlbwmon、uhttpd LuCI、tmux、htop、btop、nano 和 nftables/tun 支持；AX3600 另外内置 ethtool、iperf3、collectd 及 CPU、内存、负载、接口、磁盘空间、运行时间采集插件。不包含雅典娜 LED 及其中文翻译、PassWall2、Xray、Sing-Box、frpc/frps 或可选软件包合集。
 - 官方 25.12.2 用户态 APK 源保留；因 NSS 内核 ABI 不同，官方 kmod 源禁用。特定 U-Boot 和设备分区的实机刷写尚未验证，刷机前请核对发布包内 READ-ME.txt。
 
 ## 单独编译软件包
