@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/JDCloud-ImmortalWrt.yml
       - configs/JDCloud-Stable.config
+      - configs/Stable-General.config
       - scripts/prepare-stable-nss.sh
       - scripts/prepare-dns-cache.sh
       - scripts/verify-athena-overlay.sh
@@ -274,6 +275,7 @@ jobs:
               'luci-app-vnstat2', 'luci-i18n-vnstat2-zh-cn', 'athena-led', 'luci-app-athena-led',
               'luci-app-uhttpd', 'tmux',
               'htop', 'btop', 'nano-full', 'apk-mbedtls',
+              'iperf3', 'libiperf3', 'libatomic1',
               'kmod-nft-tproxy', 'kmod-nft-socket', 'kmod-tun',
               'block-mount', 'fstools', 'e2fsprogs', 'kmod-fs-ext4',
               'mkf2fs', 'f2fsck', 'kmod-fs-f2fs', 'sgdisk'}
@@ -347,7 +349,7 @@ jobs:
           Formal release userspace/feeds and Linux 6.12.103 are retained.
           NSS, Wi-Fi backports 7.2, matched firmware and board support are ported
           from the fixed donor recorded in SOURCES.txt, not a relabeled Snapshot.
-          Built-ins: Athena LED v2.4.0 (athena-led core + LuCI JS UI), lsblk, vnStat 2 with LuCI monitor, nftables-backed UPnP with Chinese LuCI UI, Netlink Bandwidth Monitor, uhttpd LuCI app, tmux, htop, btop, nano, cpufreq, DDNS, WoL and NSS.
+          Built-ins: Athena LED v2.4.0 (athena-led core + LuCI JS UI), lsblk, vnStat 2 with LuCI monitor, nftables-backed UPnP with Chinese LuCI UI, Netlink Bandwidth Monitor, uhttpd LuCI app, tmux, htop, btop, nano, cpufreq, DDNS, WoL, iperf3 (with libiperf3 and libatomic1) and NSS.
           Storage: mkf2fs, f2fsck, early-loaded F2FS kernel module, ext4 tools/driver and sgdisk are image-installed. fstools selects F2FS when the rootfs tail exceeds 100 MiB, including a GPT-expanded 8 GiB rootfs partition. Small original partitions retain ext4 support. No repartitioning or GPT repair runs automatically.
           Build validation extracts this factory image, checks the tools and boot module, and executes its ARM64 tools to format/check a disposable 8 GiB F2FS image and format a 60 MiB ext4 image. On-device boot and persistence still require verification.
           GPT read-only checks: sgdisk --verify /dev/mmcblk0; sgdisk --print /dev/mmcblk0; sgdisk --info=18 /dev/mmcblk0. Inspect both GPT copies before any write. See docs/athena-storage.md in the builder repository.
@@ -393,7 +395,7 @@ jobs:
           body: |
             京东云雅典娜 RE-CS-02，基于 ImmortalWrt v25.12.2 正式版的 NSS 定制固件，Linux 6.12.103。
             正式版源码 4fc16f2985a358bd43bb522e43f05395fcbd6ed5；NSS donor 0a98e096208584bf90982f59f6d5a43f89443276。
-            NSS/ECM、PPPoE、桥接/VLAN、ath11k Wi-Fi NSS；内置雅典娜 LED v2.4.0（athena-led 核心 + LuCI JS 界面）、lsblk、vnStat 2（含 LuCI 流量监控）、nftables 版 miniupnpd、中文 LuCI UPnP 界面、Netlink Bandwidth Monitor、luci-app-uhttpd、tmux、htop、btop、nano、cpufreq、DDNS、WoL。
+            NSS/ECM、PPPoE、桥接/VLAN、ath11k Wi-Fi NSS；内置雅典娜 LED v2.4.0（athena-led 核心 + LuCI JS 界面）、lsblk、vnStat 2（含 LuCI 流量监控）、nftables 版 miniupnpd、中文 LuCI UPnP 界面、Netlink Bandwidth Monitor、luci-app-uhttpd、tmux、htop、btop、nano、cpufreq、DDNS、WoL、iperf3（含 libiperf3 和 libatomic1）。
             内置 luci-app-nlbwmon。PassWall2、Xray、Sing-Box、frpc/frps 不包含，不发布可选软件包合集。
             APK 使用 ImmortalWrt 25.12.2 用户态源，NSS 内核 ABI 与官方 kmod 不兼容。PassWall2 需其项目源。路由器端若仍报 wget Operation not permitted，需另行检查路由器 WAN/DNS/路由/防火墙。
             内置 nft tproxy/socket 与 tun；省略旧式 nft/iptables compat，避免打包缺失的 ip_tables.ko。
