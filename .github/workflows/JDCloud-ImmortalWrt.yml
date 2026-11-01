@@ -8,6 +8,7 @@ on:
       - .github/workflows/JDCloud-ImmortalWrt.yml
       - configs/JDCloud-Stable.config
       - scripts/prepare-stable-nss.sh
+      - scripts/prepare-dns-cache.sh
       - scripts/verify-athena-overlay.sh
       - scripts/uci-defaults/**
       - patches/athena-led/**
