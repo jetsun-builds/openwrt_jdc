@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Check the shipped rootfs and run its ARM64 mkfs tools on disposable images.
+# Check shipped ARM64 utilities and run mkfs tools on disposable images.
 set -euo pipefail
 
 source_path=${1:?Usage: verify-athena-overlay.sh SOURCE_PATH DIAGNOSTICS_DIR}
@@ -21,10 +21,15 @@ test -x "$root_dir/usr/sbin/mkfs.f2fs"
 test -x "$root_dir/usr/sbin/fsck.f2fs"
 test -x "$root_dir/usr/sbin/mkfs.ext4"
 test -x "$root_dir/usr/bin/sgdisk"
+test -x "$root_dir/usr/bin/iperf3"
 test -n "$(find "$root_dir/lib/modules" -name 'f2fs.ko*' -print -quit)"
 grep -RFxq f2fs "$root_dir/etc/modules-boot.d"
 qemu-aarch64-static -L "$root_dir" "$root_dir/usr/bin/sgdisk" --version \
   2>&1 | tee "$diagnostics_dir/sgdisk-version.log"
+# Load the actual image's iperf3/libiperf3/libatomic1, so a missing or mismatched
+# runtime dependency fails validation before any release is published.
+qemu-aarch64-static -L "$root_dir" "$root_dir/usr/bin/iperf3" --version \
+  2>&1 | tee "$diagnostics_dir/iperf3-version.log"
 
 # Use the actual target binaries and libraries, not the runner's mkfs tools.
 truncate -s 8G "$test_dir/expanded-overlay.img"

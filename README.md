@@ -27,7 +27,7 @@
 
 ## 雅典娜正式版 NSS 构建
 - `JDCloud-ImmortalWrt` 使用官方 `v25.12.2` 标签（提交 `4fc16f2985a358bd43bb522e43f05395fcbd6ed5`）及 Linux `6.12.103`，选择性移植固定来源的 NSS、Wi-Fi 和 RE-CS-02 支持。属于基于正式版的 NSS 定制固件。
-- 配置为 `configs/JDCloud-Stable.config` 加 `configs/Stable-General.config`；内置雅典娜 LED 控制（固定使用 NONGFAH 插件提交 `564942b`）、luci-app-uhttpd、tmux、htop、btop、nano、cpufreq、DDNS、UPnP、WoL 和 nlbwmon，不内置 PassWall2 或 frpc/frps，不构建可选软件包合集。
+- 配置为 `configs/JDCloud-Stable.config` 加 `configs/Stable-General.config`；内置雅典娜 LED 控制（固定使用 NONGFAH 插件提交 `564942b`）、luci-app-uhttpd、tmux、htop、btop、nano、cpufreq、DDNS、UPnP、WoL、nlbwmon 和 iperf3，不内置 PassWall2 或 frpc/frps，不构建可选软件包合集。
 - 默认管理地址为 `192.168.1.1`。APK 保留官方 25.12.2 用户态源；NSS 内核 ABI 不同，官方目标/kmod 源禁用。PassWall2 需要其项目提供的兼容源。
 - 固件校验通过后发布到 `JDCloud-25.12.2-NSS-*`，附带源码、配置、manifest 和 SHA256 记录。实机验证另行进行，首次刷机前应核对官方系统的 eMMC GPT。
 - 扩容 rootfs 的 F2FS 初始化工具和驱动直接内置，保留小分区的 ext4 支持；构建校验实际镜像内容和 ARM64 工具。内置 `sgdisk`，GPT 主表/备份表只读检查及持久化验证见 [雅典娜存储说明](docs/athena-storage.md)。
@@ -37,6 +37,9 @@
 - 只构建 `xiaomi_ax3600` OpenWrt 扩容分区布局，不构建 `xiaomi_ax3600-stock`。发布 Factory UBI、sysupgrade 与 initramfs 恢复镜像。chenxin527 U-Boot 文档支持 AX3600 和 NAND Factory UBI，但不支持通过 U-Boot 刷 sysupgrade。
 - 软件包沿用 `configs/Stable-General.config`，包括 cpufreq、DDNS、UPnP、WoL、nlbwmon、uhttpd LuCI、tmux、htop、btop、nano 和 nftables/tun 支持；不包含雅典娜 LED 及其中文翻译、PassWall2、Xray、Sing-Box、frpc/frps 或可选软件包合集。
 - 官方 25.12.2 用户态 APK 源保留；因 NSS 内核 ABI 不同，官方 kmod 源禁用。特定 U-Boot 和设备分区的实机刷写尚未验证，刷机前请核对发布包内 READ-ME.txt。
+
+## 内置 iperf3 测速工具
+- 两款正式版 NSS 固件在共用配置中内置 `iperf3`、`libiperf3` 和 `libatomic1`，使用本次固件的同一工具链构建，刷机后即可运行 `iperf3 -s`，避免依赖安装被禁用的官方 target 源。构建会校验三者均出现在固件 manifest 中；雅典娜还会实际运行镜像中的 ARM64 `iperf3 --version` 检查动态库依赖。
 
 ## DNS 缓存与 DDNS
 - 雅典娜和 AX3600 正式版 NSS 构建会移除 dnsmasq 的最小 TTL 和过期缓存默认值，按上游 TTL 缓存记录；60 秒 TTL 不会被本机强制延长到一小时。新装及恢复出厂使用修正后的默认配置，保留配置升级时由首次启动脚本清理各 dnsmasq 实例中的 `min_cache_ttl`、旧版 `mini_ttl` 和 `use_stale_cache`。缓存容量及 DNS 上游不变；如果上游已经延长 TTL，仍需在上游单独修正。
