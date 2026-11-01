@@ -10,6 +10,8 @@ on:
       - 'configs/AX3600-Stable.config'
       - 'configs/Stable-General.config'
       - 'scripts/prepare-stable-nss.sh'
+      - 'scripts/prepare-dns-cache.sh'
+      - 'scripts/uci-defaults/**'
 
 permissions:
   contents: read

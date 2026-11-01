@@ -66,6 +66,10 @@ kernel_mk.write_text(text.replace(needle, needle + '\t: > $(PKG_BUILD_DIR)/Modul
 
 PY
 
+# Remove the release's one-hour DNS TTL floor from packaged defaults and migrate
+# retained settings on first boot. Shared by the Athena and AX3600 stable builds.
+bash "$BUILDER_ROOT/scripts/prepare-dns-cache.sh" "$SOURCE_DIR"
+
 # Keep official user-space APK feeds, disable incompatible target kmods, and
 # enable the image-installed LED service. These scripts are checked in as
 # regular files so their syntax can be tested independently.
@@ -95,4 +99,3 @@ mkdir -p "$BUILDER_ROOT/artifacts/diagnostics"
 } > "$BUILDER_ROOT/artifacts/diagnostics/SOURCES.txt"
 git diff --binary > "$BUILDER_ROOT/artifacts/diagnostics/stable-nss-port.patch"
 cp feeds.conf.default "$BUILDER_ROOT/artifacts/diagnostics/feeds.conf"
-

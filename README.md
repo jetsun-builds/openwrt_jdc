@@ -38,6 +38,9 @@
 - 软件包沿用 `configs/Stable-General.config`，包括 cpufreq、DDNS、UPnP、WoL、nlbwmon、uhttpd LuCI、tmux、htop、btop、nano 和 nftables/tun 支持；AX3600 另外内置 ethtool、iperf3、collectd 及 CPU、内存、负载、接口、磁盘空间、运行时间采集插件。不包含雅典娜 LED 及其中文翻译、PassWall2、Xray、Sing-Box、frpc/frps 或可选软件包合集。
 - 官方 25.12.2 用户态 APK 源保留；因 NSS 内核 ABI 不同，官方 kmod 源禁用。特定 U-Boot 和设备分区的实机刷写尚未验证，刷机前请核对发布包内 READ-ME.txt。
 
+## DNS 缓存与 DDNS
+- 雅典娜和 AX3600 正式版 NSS 构建会移除 dnsmasq 的最小 TTL 和过期缓存默认值，按上游 TTL 缓存记录；60 秒 TTL 不会被本机强制延长到一小时。新装及恢复出厂使用修正后的默认配置，保留配置升级时由首次启动脚本清理各 dnsmasq 实例中的 `min_cache_ttl`、旧版 `mini_ttl` 和 `use_stale_cache`。缓存容量及 DNS 上游不变；如果上游已经延长 TTL，仍需在上游单独修正。
+
 ## 单独编译软件包
 - 本节的稳定版 SDK 仅用于编译软件包，不决定其他整机固件工作流的源码版本。
 - 点击 `Actions` 运行 `Build-Packages`，`sdk_version` 可选择 `ALL` 同时编译全部版本，或选择 `main` 主线 snapshots、`23.05`、`24.10`、`25.12` 系列的最新稳定版 SDK。

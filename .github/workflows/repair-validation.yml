@@ -9,6 +9,7 @@ on:
       - .github/workflows/JDCloud-ImmortalWrt.yml
       - patches/athena-led/**
       - scripts/prepare-stable-nss.sh
+      - scripts/prepare-dns-cache.sh
       - scripts/uci-defaults/**
   workflow_dispatch:
 
@@ -26,6 +27,8 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/prepare-stable-nss.sh
+          bash -n scripts/prepare-dns-cache.sh
+          sh -n scripts/uci-defaults/99-dns-cache-ttl
           sh -n scripts/uci-defaults/99-nss-release-feeds
           sh -n scripts/uci-defaults/99-athena-led
           repo_list=$(mktemp)

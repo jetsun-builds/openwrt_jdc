@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Run once after installation/sysupgrade, including upgrades that keep settings.
+# Respect upstream TTLs and stop reusing expired answers. Keep DNS caching itself
+# enabled; the dnsmasq default minimum TTL is zero when no floor is configured.
+sections=$(uci -q show dhcp) || exit 1
+changed=0
+for section in $(printf '%s\n' "$sections" | sed -n 's/^\(dhcp\.[^.]*\)=dnsmasq$/\1/p'); do
+    for option in min_cache_ttl mini_ttl use_stale_cache; do
+        if uci -q get "$section.$option" >/dev/null; then
+            uci -q delete "$section.$option" || exit 1
+            changed=1
+        fi
+    done
+done
+
+if [ "$changed" -eq 1 ]; then
+    uci commit dhcp || exit 1
+fi
+
+exit 0
